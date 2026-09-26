@@ -27,10 +27,10 @@ CREATE TABLE IF NOT EXISTS boxes (
     project_id  TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     box_type    TEXT NOT NULL,
     label       TEXT NOT NULL,
-    parameters  TEXT NOT NULL,
-    dieline     TEXT NOT NULL,
-    folding     TEXT,
-    preflight   TEXT,
+    parameters  TEXT NOT NULL,          -- JSON
+    dieline     TEXT NOT NULL,          -- JSON (DielineData)
+    folding     TEXT,                   -- JSON (3D 折叠数据)
+    preflight   TEXT,                   -- JSON (预检报告)
     thickness   REAL DEFAULT 0.45,
     material    TEXT DEFAULT '350g 白卡',
     created_at  REAL NOT NULL,
@@ -80,9 +80,9 @@ CREATE TABLE IF NOT EXISTS recipes (
     id          TEXT PRIMARY KEY,
     name        TEXT NOT NULL,
     box_type    TEXT NOT NULL,
-    parameters  TEXT NOT NULL,
+    parameters  TEXT NOT NULL,          -- JSON
     material    TEXT DEFAULT '350g 白卡',
-    finishes    TEXT DEFAULT '[]',
+    finishes    TEXT DEFAULT '[]',      -- JSON list
     prompt      TEXT DEFAULT '',
     created_at  REAL NOT NULL
 );
@@ -90,6 +90,7 @@ CREATE TABLE IF NOT EXISTS recipes (
 
 
 def _migrate(conn: sqlite3.Connection) -> None:
+    """幂等迁移：为旧库补充新列。"""
     cols = {r["name"] for r in conn.execute("PRAGMA table_info(boxes)")}
     if "notes" not in cols:
         conn.execute("ALTER TABLE boxes ADD COLUMN notes TEXT DEFAULT ''")
@@ -138,10 +139,15 @@ def init_db() -> None:
 def _insert(conn: sqlite3.Connection, table: str, data: Dict[str, Any]) -> None:
     cols = ", ".join(data.keys())
     marks = ", ".join("?" for _ in data)
-    conn.execute(f"INSERT INTO {table} ({cols}) VALUES ({marks})", list(data.values()))
+    conn.execute(f"INSERT INTO {table} ({cols}) VALUES ({marks})",
+                 list(data.values()))
 
 
+# ---------------------------------------------------------------------------
+# 种子数据
+# ---------------------------------------------------------------------------
 def seed_materials_and_sample() -> None:
+    """写入示例项目（若无数据）。"""
     from .engines import dieline, folding, preflight
     with get_db() as conn:
         cnt = conn.execute("SELECT COUNT(*) c FROM projects").fetchone()["c"]

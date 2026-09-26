@@ -40,8 +40,13 @@ app.include_router(ai.router)
 
 @app.get("/api/health")
 def health() -> dict:
+    return {"status": "ok", "version": "1.0.0",
+            "boxTypes": len([1]) and __box_count()}
+
+
+def __box_count() -> int:
     from .engines.dieline import BOX_REGISTRY
-    return {"status": "ok", "version": "1.0.0", "boxTypes": len(BOX_REGISTRY)}
+    return len(BOX_REGISTRY)
 
 
 @app.get("/")
